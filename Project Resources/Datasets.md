@@ -1,0 +1,1 @@
+[Kaggle Data Set Moxi Town Landslide Images](https://www.kaggle.com/datasets/srivatsraghavan4/landslide-images-moxi-town)
