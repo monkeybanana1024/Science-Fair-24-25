@@ -3,8 +3,7 @@ import serial
 import serial.tools.list_ports
 import time
 import csv
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QSlider, QLabel, QVBoxLayout, QHBoxLayout, 
-                             QDialog, QComboBox, QFrame, QWidget, QFileDialog, QMessageBox, QTextEdit, QLineEdit)
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QSlider, QLabel, QVBoxLayout, QHBoxLayout, QDialog, QComboBox, QFrame, QWidget, QFileDialog, QMessageBox, QTextEdit, QLineEdit)
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 
@@ -134,6 +133,14 @@ class CombinedUI(QMainWindow):
         left_panel.addWidget(self.flow_label)
         left_panel.addWidget(self.flow_slider)
 
+        # Incline input
+        incline_layout = QHBoxLayout()
+        self.incline_input = QLineEdit()
+        self.incline_input.setPlaceholderText("Enter incline (0-90)")
+        incline_layout.addWidget(QLabel('Incline:'))
+        incline_layout.addWidget(self.incline_input)
+        left_panel.addLayout(incline_layout)
+
         # Data display
         self.timestamp_label = QLabel('Timestamp: ')
         self.moisture_label = QLabel('Moisture: ')
@@ -141,23 +148,21 @@ class CombinedUI(QMainWindow):
         self.movement_x_label = QLabel('Movement X: ')
         self.movement_y_label = QLabel('Movement Y: ')
         self.movement_z_label = QLabel('Movement Z: ')
-        
-        for label in [self.timestamp_label, self.moisture_label, self.flow_rate_label,
-                      self.movement_x_label, self.movement_y_label, self.movement_z_label]:
+        for label in [self.timestamp_label, self.moisture_label, self.flow_rate_label, self.movement_x_label, self.movement_y_label, self.movement_z_label]:
             label.setAlignment(Qt.AlignCenter)
             label.setStyleSheet("background-color: #34495e; padding: 10px; border-radius: 5px;")
             left_panel.addWidget(label)
 
         # Event marking buttons
-        self.slump_button = QPushButton('Mark Slump')
-        self.slump_button.clicked.connect(lambda: self.mark_event('Slump'))
+        self.landslide_button = QPushButton('Mark Landslide')
+        self.landslide_button.clicked.connect(lambda: self.mark_event('Landslide'))
         self.debris_button = QPushButton('Mark Debris')
         self.debris_button.clicked.connect(lambda: self.mark_event('Debris'))
-        self.slide_button = QPushButton('Mark Slide')
-        self.slide_button.clicked.connect(lambda: self.mark_event('Slide'))
-        left_panel.addWidget(self.slump_button)
+        self.slump_button = QPushButton('Mark Slump')
+        self.slump_button.clicked.connect(lambda: self.mark_event('Slump'))
+        left_panel.addWidget(self.landslide_button)
         left_panel.addWidget(self.debris_button)
-        left_panel.addWidget(self.slide_button)
+        left_panel.addWidget(self.slump_button)
 
         main_layout.addLayout(left_panel)
 
@@ -218,7 +223,7 @@ class CombinedUI(QMainWindow):
         if file_path:
             self.csv_file = open(file_path, 'w', newline='')
             self.csv_writer = csv.writer(self.csv_file)
-            self.csv_writer.writerow(['Timestamp', 'Water Flow Rate', 'Moisture', 'Movement X', 'Movement Y', 'Movement Z', 'Event'])
+            self.csv_writer.writerow(['Timestamp', 'Water Flow Rate', 'Moisture', 'Movement X', 'Movement Y', 'Movement Z', 'Incline', 'Landslide', 'Debris', 'Slump'])
 
             # Send START command after file is created
             try:
@@ -261,16 +266,23 @@ class CombinedUI(QMainWindow):
 
                 # Write to CSV
                 if self.csv_writer:
-                    self.csv_writer.writerow([timestamp, flow_rate, moisture, movement_x, movement_y, movement_z, ''])
+                    incline = self.incline_input.text()
+                    self.csv_writer.writerow([timestamp, flow_rate, moisture, movement_x, movement_y, movement_z, incline, 0, 0, 0])
                     self.csv_file.flush()
-
             except Exception as e:
                 self.monitor.append(f"Error decoding data: {e}")
 
     def mark_event(self, event_type):
         if self.csv_writer:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            self.csv_writer.writerow([timestamp, '', '', '', '', '', event_type])
+            row = [timestamp, '', '', '', '', '', self.incline_input.text(), 0, 0, 0]
+            if event_type == 'Landslide':
+                row[7] = 1
+            elif event_type == 'Debris':
+                row[8] = 1
+            elif event_type == 'Slump':
+                row[9] = 1
+            self.csv_writer.writerow(row)
             self.csv_file.flush()
             self.monitor.append(f"{event_type} event marked at {timestamp}")
 
