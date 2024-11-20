@@ -16,7 +16,7 @@ def load_data(directory):
     return pd.concat(data, ignore_index=True)
 
 # Load data
-train_data = load_data('Data/train')
+train_data = load_data('Data/Train')
 valid_data = load_data('Data/Valid')
 test_data = load_data('Data/Test')
 
@@ -52,8 +52,8 @@ for event in target_events:
               verbose=False)
     models[event] = model
 
-# Function to make predictions and save results
-def predict_and_save(X, y, data, scaled_data, folder_name):
+# Function to make predictions and save results with modified filenames
+def predict_and_save(X, y, data, scaled_data, folder_name, suffix):
     results_df = data.copy()
     
     for event in target_events:
@@ -63,25 +63,33 @@ def predict_and_save(X, y, data, scaled_data, folder_name):
 
     # Ensure the directory exists
     os.makedirs(folder_name, exist_ok=True)
-    
-    # Save the results
-    results_df.to_csv(os.path.join(folder_name, 'results_with_predictions.csv'), index=False)
+
+    # Save the results with appended suffix
+    results_file_name = os.path.join(folder_name, f'results_with_predictions_{suffix}.csv')
+    results_df.to_csv(results_file_name, index=False)
     
     return results_df
 
-# Make predictions and save results for validation and test sets
-valid_results = predict_and_save(X_valid, y_valid, valid_data, X_valid_scaled, 'ValidResults')
-test_results = predict_and_save(X_test, y_test, test_data, X_test_scaled, 'TestResults')
+# Make predictions and save results for validation and test sets with suffixes
+os.chdir('XGBoost')
+valid_results = predict_and_save(X_valid, y_valid, valid_data, X_valid_scaled, 'ValidResults', 'Valid')
+test_results = predict_and_save(X_test, y_test, test_data, X_test_scaled, 'TestResults', 'Test')
 
-# Feature importance analysis
+# Feature importance analysis and saving plots with modified filenames
 for event in target_events:
     explainer = shap.TreeExplainer(models[event])
     shap_values = explainer.shap_values(X_test_scaled)
+    
     plt.figure()
     shap.summary_plot(shap_values, X_test, plot_type="bar", show=False)
+    
+    # Save plot with appended suffix
     plt.title(f'Feature Importance for {event} Prediction')
     plt.tight_layout()
-    plt.savefig(f'TestResults/{event}_feature_importance.png')
+    
+    plot_file_name = f'TestResults/{event}_feature_importance_Test.png'
+    plt.savefig(plot_file_name)
+    
     plt.close()
 
 print("Analysis complete. Results saved in 'ValidResults' and 'TestResults' folders.")
