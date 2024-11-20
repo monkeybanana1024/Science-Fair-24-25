@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 import shap
 import os
 import matplotlib.pyplot as plt
+import joblib  # for saving the scaler
 
 # Function to load data from a directory
 def load_data(directory):
@@ -14,6 +15,35 @@ def load_data(directory):
             df = pd.read_csv(os.path.join(directory, file))
             data.append(df)
     return pd.concat(data, ignore_index=True)
+
+# Function to export models
+def export_models(models, scaler, export_dir='exported_models'):
+    os.makedirs(export_dir, exist_ok=True)
+    for event, model in models.items():
+        model_path = os.path.join(export_dir, f'{event}_model.json')
+        model.save_model(model_path)
+    
+    scaler_path = os.path.join(export_dir, 'scaler.joblib')
+    joblib.dump(scaler, scaler_path)
+    
+    print(f"Models and scaler exported to {export_dir}")
+
+# Function to import models
+def import_models(import_dir='exported_models'):
+    models = {}
+    for file in os.listdir(import_dir):
+        if file.endswith('_model.json'):
+            event = file.split('_')[0]
+            model_path = os.path.join(import_dir, file)
+            model = XGBClassifier()
+            model.load_model(model_path)
+            models[event] = model
+    
+    scaler_path = os.path.join(import_dir, 'scaler.joblib')
+    scaler = joblib.load(scaler_path)
+    
+    print(f"Models and scaler imported from {import_dir}")
+    return models, scaler
 
 # Load data
 train_data = load_data('Data/Train')
@@ -94,3 +124,10 @@ for event in target_events:
 
 print("Analysis complete. Results saved in 'ValidResults' and 'TestResults' folders.")
 print("Feature importance plots saved in 'TestResults' folder.")
+
+# Export the trained models and scaler
+export_models(models, scaler)
+
+# To use the imported models later, you can uncomment the following lines:
+imported_models, imported_scaler = import_models()
+# Then use imported_models and imported_scaler instead of models and scaler
