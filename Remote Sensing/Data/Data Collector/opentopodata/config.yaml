@@ -16,11 +16,10 @@ datasets:
 # A small testing dataset is included in the repo.
 - name: test-dataset
   path: tests/data/datasets/test-etopo1-resampled-1deg/
-# Configuration for ned10m dataset 
+  
 - name: ned10m
   path: data/ned10m/
   filename_epsg: 4269
-
 # Example config for 90 metre SRTM.
 # - name: srtm90m
 #   path: data/srtm-90m-nasa-v3.0/
