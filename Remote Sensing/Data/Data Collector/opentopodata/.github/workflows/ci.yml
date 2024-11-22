@@ -1,0 +1,20 @@
+name: build
+
+on: [push]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build docker image
+      run: make build
+    - name: Run tests
+      run: make test
+    - name: Test M1 image too
+      run: make test-m1
+    - name: Check code formatting
+      run: make black-check
