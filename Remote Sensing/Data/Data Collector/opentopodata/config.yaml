@@ -3,7 +3,7 @@
 
 
 # 400 error will be thrown above this limit.
-max_locations_per_request: 100 
+max_locations_per_request: 1000
 
 
 # CORS header. Should be null for no CORS, '*' for all domains, or a url with
