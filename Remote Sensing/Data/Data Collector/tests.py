@@ -1,32 +1,34 @@
-import py7zr
 import numpy as np
-import tempfile
-import os
+import matplotlib.pyplot as plt
+from rasterio.enums import Resampling
+import rasterio
 
-# Specify the path to your 7z file and the file you want to access
-seven_zip_file_path = 'n10_susc.7z'
-file_to_access = 'n10_susc/n10_conus.tif'  # The file you want to access inside the 7z archive
+# Path to your TIFF file
+tiff_file_path = 'USGS-susc/n10_conus.tif'
 
-# Create a temporary directory for extraction
-with tempfile.TemporaryDirectory() as temp_dir:
-    # Open the 7z file
-    with py7zr.SevenZipFile(seven_zip_file_path, mode='r') as z:
-        # Extract all files into the temporary directory
-        z.extract(path=temp_dir)
+# Open the TIFF file
+with rasterio.open(tiff_file_path) as src:
+    # Read the data into a memory-mapped array
+    data = src.read(1, out_shape=(src.height, src.width), 
+                    resampling=Resampling.nearest)
 
-    # Now access the specific file in the temporary directory
-    extracted_file_path = os.path.join(temp_dir, file_to_access)
+    # Get the metadata
+    transform = src.transform
+    crs = src.crs
 
-    # Check if the extracted file exists
-    if os.path.exists(extracted_file_path):
-        # Memory-map the extracted file
-        mmap_array = np.memmap(extracted_file_path, dtype='S', mode='r', shape=os.path.getsize(extracted_file_path))
+# Create a figure and axis
+fig, ax = plt.subplots(figsize=(10, 10))
 
-        # Now you can access the data from the memory-mapped array
-        print(mmap_array.tobytes().decode('utf-8'))  # Assuming the content is text
+# Display the image
+im = ax.imshow(data, cmap='terrain')
 
-        # Explicitly delete the memory-mapped array to release it before exiting the context
-        del mmap_array  # This ensures that resources are released
+# Add a colorbar
+plt.colorbar(im, ax=ax, label='Elevation')
 
-    else:
-        print(f"File {file_to_access} not found in the extracted files.")
+# Set title and labels
+ax.set_title('Elevation Map')
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+
+# Show the plot
+plt.show()
