@@ -3,9 +3,8 @@ import serial
 import serial.tools.list_ports
 import time
 import csv
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QSlider, QLabel, QVBoxLayout, QHBoxLayout, QDialog, QComboBox, QFrame, QWidget, QFileDialog, QMessageBox, QTextEdit, QLineEdit)
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QMessageBox, QTextEdit, QLineEdit, QComboBox)
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont
 
 class StyleHelper:
     @staticmethod
@@ -30,32 +29,6 @@ class StyleHelper:
         QPushButton:hover {
             background-color: #2980b9;
         }
-        QSlider::groove:horizontal {
-            border: 1px solid #bbb;
-            background: white;
-            height: 10px;
-            border-radius: 4px;
-        }
-        QSlider::sub-page:horizontal {
-            background: #3498db;
-            border: 1px solid #777;
-            height: 10px;
-            border-radius: 4px;
-        }
-        QSlider::add-page:horizontal {
-            background: #bbb;
-            border: 1px solid #777;
-            height: 10px;
-            border-radius: 4px;
-        }
-        QSlider::handle:horizontal {
-            background: #3498db;
-            border: 1px solid #777;
-            width: 20px;
-            margin-top: -5px;
-            margin-bottom: -5px;
-            border-radius: 10px;
-        }
         QComboBox, QLineEdit {
             border: 1px solid #3498db;
             border-radius: 3px;
@@ -73,6 +46,7 @@ class StyleHelper:
             font-size: 16px;
         }
         """
+
 
 class CombinedUI(QMainWindow):
     def __init__(self):
@@ -94,7 +68,8 @@ class CombinedUI(QMainWindow):
         main_layout = QHBoxLayout(central_widget)
 
         # Left panel for Arduino Control
-        left_panel = QVBoxLayout()
+        left_panel_widget = QWidget()
+        left_panel = QVBoxLayout(left_panel_widget)
 
         # Port selection
         port_layout = QHBoxLayout()
@@ -121,18 +96,6 @@ class CombinedUI(QMainWindow):
         left_panel.addWidget(self.start_button)
         left_panel.addWidget(self.stop_button)
 
-        # Flow control
-        self.flow_slider = QSlider(Qt.Horizontal)
-        self.flow_slider.setMinimum(0)
-        self.flow_slider.setMaximum(100)
-        self.flow_slider.setValue(50)
-        self.flow_slider.setTickPosition(QSlider.TicksBelow)
-        self.flow_slider.setTickInterval(10)
-        self.flow_label = QLabel('Water Flow Rate: 50%')
-        self.flow_slider.valueChanged.connect(self.update_flow_label)
-        left_panel.addWidget(self.flow_label)
-        left_panel.addWidget(self.flow_slider)
-
         # Incline input
         incline_layout = QHBoxLayout()
         self.incline_input = QLineEdit()
@@ -143,12 +106,14 @@ class CombinedUI(QMainWindow):
 
         # Data display
         self.timestamp_label = QLabel('Timestamp: ')
+        self.water_flow_label = QLabel('Water Flow: ')
         self.moisture_label = QLabel('Moisture: ')
-        self.flow_rate_label = QLabel('Water Flow Rate: ')
         self.movement_x_label = QLabel('Movement X: ')
         self.movement_y_label = QLabel('Movement Y: ')
         self.movement_z_label = QLabel('Movement Z: ')
-        for label in [self.timestamp_label, self.moisture_label, self.flow_rate_label, self.movement_x_label, self.movement_y_label, self.movement_z_label]:
+
+        for label in [self.timestamp_label, self.water_flow_label, self.moisture_label, 
+                      self.movement_x_label, self.movement_y_label, self.movement_z_label]:
             label.setAlignment(Qt.AlignCenter)
             label.setStyleSheet("background-color: #34495e; padding: 10px; border-radius: 5px;")
             left_panel.addWidget(label)
@@ -164,12 +129,10 @@ class CombinedUI(QMainWindow):
         left_panel.addWidget(self.debris_button)
         left_panel.addWidget(self.slump_button)
 
-        main_layout.addLayout(left_panel)
+        main_layout.addWidget(left_panel_widget)
 
         # Right panel for Serial Monitor
         right_panel = QVBoxLayout()
-
-        # Monitor
         self.monitor = QTextEdit()
         self.monitor.setReadOnly(True)
         right_panel.addWidget(self.monitor)
@@ -195,10 +158,10 @@ class CombinedUI(QMainWindow):
         if self.arduino is None:
             try:
                 port = self.port_combo.currentText()
-                self.arduino = serial.Serial(port, 9600, timeout=0.1)
+                self.arduino = serial.Serial(port, 115200, timeout=0.1)
                 self.connect_button.setText('Disconnect')
                 self.monitor.append(f"Connected to {port}")
-                self.timer.start(10)
+                self.timer.start(100)  # Update every 100 ms
             except serial.SerialException as e:
                 self.monitor.append(f"Error: {str(e)}")
         else:
@@ -209,30 +172,20 @@ class CombinedUI(QMainWindow):
             self.monitor.append("Disconnected")
             self.timer.stop()
 
-    def update_flow_label(self, value):
-        self.flow_label.setText(f'Water Flow Rate: {value}%')
-        if self.arduino:
-            self.arduino.write(f"FLOW:{value}\n".encode())
-
     def start_monitoring(self):
         if not self.arduino:
             QMessageBox.warning(self, "Not Connected", "Please connect to a port first.")
             return
-
         file_path, _ = QFileDialog.getSaveFileName(self, "Save CSV File", "", "CSV Files (*.csv)")
         if file_path:
             self.csv_file = open(file_path, 'w', newline='')
             self.csv_writer = csv.writer(self.csv_file)
-            self.csv_writer.writerow(['Timestamp', 'Water Flow Rate', 'Moisture', 'Movement X', 'Movement Y', 'Movement Z', 'Incline', 'Landslide', 'Debris', 'Slump'])
-
-            # Send START command after file is created
+            self.csv_writer.writerow(['Timestamp', 'Water Flow', 'Moisture', 'Movement X', 'Movement Y', 'Movement Z', 'Landslide', 'Debris', 'Slump', 'Incline'])
             try:
                 self.arduino.write(b"START\n")
             except Exception as e:
                 self.monitor.append(f"Failed to start monitoring: {e}")
                 return
-
-            self.timer.start(1000)
             self.start_button.setEnabled(False)
             self.stop_button.setEnabled(True)
             self.monitor.append("Monitoring started")
@@ -254,20 +207,18 @@ class CombinedUI(QMainWindow):
             try:
                 data = self.arduino.readline().decode('utf-8').strip()
                 self.monitor.append(data)
-                timestamp, flow_rate, moisture, movement_x, movement_y, movement_z = data.split(',')
+                timestamp, water_flow, moisture, movement_x, movement_y, movement_z = data.split(',')
                 
-                # Update labels
                 self.timestamp_label.setText(f'Timestamp: {timestamp}')
+                self.water_flow_label.setText(f'Water Flow: {water_flow}')
                 self.moisture_label.setText(f'Moisture: {moisture}')
-                self.flow_rate_label.setText(f'Water Flow Rate: {flow_rate}')
                 self.movement_x_label.setText(f'Movement X: {movement_x}')
                 self.movement_y_label.setText(f'Movement Y: {movement_y}')
                 self.movement_z_label.setText(f'Movement Z: {movement_z}')
-
-                # Write to CSV
+                
                 if self.csv_writer:
                     incline = self.incline_input.text()
-                    self.csv_writer.writerow([timestamp, flow_rate, moisture, movement_x, movement_y, movement_z, incline, 0, 0, 0])
+                    self.csv_writer.writerow([timestamp, water_flow, moisture, movement_x, movement_y, movement_z, 0, 0, 0, incline])
                     self.csv_file.flush()
             except Exception as e:
                 self.monitor.append(f"Error decoding data: {e}")
@@ -275,13 +226,13 @@ class CombinedUI(QMainWindow):
     def mark_event(self, event_type):
         if self.csv_writer:
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            row = [timestamp, '', '', '', '', '', self.incline_input.text(), 0, 0, 0]
+            row = [timestamp, '', '', '', '', '', 0, 0, 0, self.incline_input.text()]
             if event_type == 'Landslide':
-                row[7] = 1
+                row[6] = 1
             elif event_type == 'Debris':
-                row[8] = 1
+                row[7] = 1
             elif event_type == 'Slump':
-                row[9] = 1
+                row[8] = 1
             self.csv_writer.writerow(row)
             self.csv_file.flush()
             self.monitor.append(f"{event_type} event marked at {timestamp}")
@@ -298,6 +249,7 @@ class CombinedUI(QMainWindow):
         if self.arduino:
             self.arduino.close()
         event.accept()
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

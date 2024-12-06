@@ -3,10 +3,10 @@
 
 #include <Arduino.h>
 
-#define l1digital 2
-#define l2digital 3
-#define u1digital 4
-#define u2digital 5
+#define l1digital 3
+#define l2digital 4
+#define u1digital 5
+#define u2digital 6
 
 #define l1analog A0
 #define l2analog A1
