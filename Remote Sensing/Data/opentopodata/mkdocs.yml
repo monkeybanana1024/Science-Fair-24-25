@@ -1,0 +1,53 @@
+site_name: Open Topo Data
+site_url: https://www.opentopodata.org
+site_description: Open DEM server.
+
+theme:
+    name: 'material'
+
+repo_name: ajnisbet/opentopodata
+repo_url: https://github.com/ajnisbet/opentopodata
+
+extra:
+  analytics:
+    provider: 'google'
+    property: 'UA-59478184-7'
+
+nav:
+    - Introduction: 'index.md'
+    - Server docs: 'server.md'
+    - API docs: 'api.md'
+    - Release notes: 'changelog.md'
+    - Datasets:
+      - ASTER: 'datasets/aster.md'
+      - ETOPO1: 'datasets/etopo1.md'
+      - EU-DEM: 'datasets/eudem.md'
+      - Mapzen: 'datasets/mapzen.md'
+      - NED: 'datasets/ned.md'
+      - NZ DEM: 'datasets/nzdem.md'
+      - SRTM: 'datasets/srtm.md'
+      - EMOD bathymetry: 'datasets/emod2018.md'
+      - GEBCO bathymetry: 'datasets/gebco2020.md'
+      - BKG: 'datasets/bkg.md'
+      - Swisstopo: 'datasets/swisstopo.md'
+    - Notes:
+      - Windows support: 'notes/windows-support.md'
+      - Cloud storage: 'notes/cloud-storage.md'
+      - Invalid SRTM zips: 'notes/invalid-srtm-zips.md'
+      - Dataset sizes: 'notes/dataset-sizes.md'
+      - Buffering tiles: 'notes/buffering-tiles.md'
+      - Multiple datasets: 'notes/multiple-datasets.md'
+      - Performance optimisation: 'notes/performance-optimisation.md'
+      - Run without docker: 'notes/running-without-docker.md'
+      - Kubernetes: 'notes/kubernetes.md'
+
+extra_javascript:
+  - js/extra.js
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
