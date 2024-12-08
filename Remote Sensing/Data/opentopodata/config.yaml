@@ -19,9 +19,9 @@ datasets:
 
   # ned10m dataset
   - name: ned10m
-    path: data/ned10m/ned10m.vrt
-    type: vrt
+    path: data/ned10m/
     filename_epsg: 4269
+    type: vrt
 # Example config for 90 metre SRTM.
 # - name: srtm90m
 #   path: data/srtm-90m-nasa-v3.0/
