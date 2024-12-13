@@ -30,13 +30,13 @@ def ensure_file_exists(file_path):
         
 def main():
     # Path to your TIFF file
-    tiff_file = 'n10_conus.tif'  # Update this path
+    tiff_file = 'Collection/n10_conus.tif'  # Update this path
     ensure_file_exists(tiff_file)
     
     print(os.listdir())
     
     # Create Test directory if it doesn't exist
-    test_dir = 'Datasets'
+    test_dir = 'Datasets/'
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
     
@@ -48,7 +48,7 @@ def main():
 
     # Read coordinates from the file
     os.chdir("..")
-    coordinates_file = 'coordinates.txt'
+    coordinates_file = 'Collection/coordinates.txt'
     ensure_file_exists(coordinates_file)
     
     with open(coordinates_file, 'r') as coord_file:
@@ -69,7 +69,7 @@ def main():
 
             # Write the result to susc.txt in the appropriate folder
             with open(output_file_path, 'a') as output_file:
-                output_file.write(f"{lat}, {long}: {value}\n")
+                output_file.write(value)
 
         except ValueError as e:
             print(f"Error processing line {index + 1}: {line.strip()} - {e}")

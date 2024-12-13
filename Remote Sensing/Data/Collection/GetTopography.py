@@ -8,7 +8,7 @@ ee.Initialize(project='ee-sciencefair2425')
 ned = ee.Image('USGS/3DEP/10m')
 
 # Read coordinates from file
-with open('coordinates.txt', 'r') as file:
+with open('Collection/coordinates.txt', 'r') as file:
     coordinates = [line.strip().split(',') for line in file]
 
 # Main directory
@@ -32,7 +32,7 @@ for lat, lon in coordinates:
     clipped_ned = ned.clip(region)
 
     # Define the output path
-    output_path = f'{main_dir}/{sub_dir_num}/topography.tif'
+    output_path = f'{main_dir}/{sub_dir_num}/original_topography.tif'
 
     # Use geemap to download the image
     geemap.ee_export_image(
