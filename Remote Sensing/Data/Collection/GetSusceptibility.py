@@ -69,7 +69,8 @@ def main():
 
             # Write the result to susc.txt in the appropriate folder
             with open(output_file_path, 'a') as output_file:
-                output_file.write(value)
+                output_file.write(str(value))
+                print(f"Processed line {index + 1}: {line.strip()}")
 
         except ValueError as e:
             print(f"Error processing line {index + 1}: {line.strip()} - {e}")
