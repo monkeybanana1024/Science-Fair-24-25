@@ -1,13 +1,15 @@
 import ee
 import os
 import geemap
+import numpy as np
+from PIL import Image
 
 # Initialize Earth Engine
 ee.Initialize(project='ee-sciencefair2425')
 
 def get_ndvi(image):
-    """Calculate NDVI from Sentinel-2 imagery."""
-    ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI')
+    """Calculate NDVI from NAIP imagery."""
+    ndvi = image.normalizedDifference(['N', 'R']).rename('NDVI')  # N is Near Infrared, R is Red
     return image.addBands(ndvi)
 
 def read_coordinates(file_path):
@@ -26,47 +28,35 @@ def create_aoi(lat, lon):
     region = center_point.buffer(804.672).bounds()  # 804.672 meters = 0.5 miles
     return region
 
-def remap_ndvi(ndvi_image):
-    """Remap positive NDVI values to [0, 255] while leaving negative values unchanged."""
-    ndvi_remapped = ndvi_image.where(ndvi_image.gt(0), 
-                                      ndvi_image.subtract(-1).divide(2).multiply(255).byte())
-    return ndvi_remapped
-
-def enhance_image(ndvi_image):
-    """Enhance NDVI image using contrast stretching."""
-    min_max = ndvi_image.reduceRegion(
-        reducer=ee.Reducer.minMax(),
-        geometry=ndvi_image.geometry(),
-        scale=30,
-        bestEffort=True
-    )
-
-    min_val = ee.Number(min_max.get('NDVI_min'))
-    max_val = ee.Number(min_max.get('NDVI_max'))
-
-    # Apply contrast stretching
-    stretched_ndvi = ndvi_image.subtract(min_val).divide(max_val.subtract(min_val)).multiply(255).byte()
-
-    return stretched_ndvi
-
-def apply_color_map(ndvi_image):
-    """Apply a color map to the NDVI image for better visualization."""
-    # Define color palette for NDVI values
+def apply_color_map(ndvi_array):
+    """Apply a gradient color map to the NDVI array for better visualization."""
+    # Define color gradient for NDVI values (from low to high)
     color_palette = [
-        'white',   # Low NDVI (water)
-        'white',  # Bare soil
-        'yellow', # Sparse vegetation
-        'green'   # Dense vegetation
+        (255, 0, 0),   # Low NDVI (water)
+        (255, 0, 0),  # Bare soil
+        (255, 255, 0),   # Sparse vegetation (yellow)
+        (0, 255, 0)      # Dense vegetation (green)
     ]
 
-    # Create a visualization dictionary
-    vis_params = {
-        'min': 0,
-        'max': 255,
-        'palette': color_palette
-    }
+    # Create an empty RGB image
+    rgb_image = np.zeros((ndvi_array.shape[0], ndvi_array.shape[1], 3), dtype=np.uint8)
 
-    return ndvi_image.visualize(**vis_params)
+    # Normalize NDVI values to [0, 1]
+    ndvi_normalized = np.clip((ndvi_array + 1) / 2, 0, 1)  # Normalize NDVI from [-1, 1] to [0, 1]
+
+    # Interpolate colors based on normalized NDVI values
+    for i in range(len(color_palette) - 1):
+        lower_color = np.array(color_palette[i])
+        upper_color = np.array(color_palette[i + 1])
+        
+        # Create a mask for the range of normalized NDVI values
+        mask = (ndvi_normalized >= i / (len(color_palette) - 1)) & (ndvi_normalized <= (i + 1) / (len(color_palette) - 1))
+        
+        # Interpolate between the two colors
+        ratio = (ndvi_normalized[mask] * (len(color_palette) - 1) - i).reshape(-1, 1)
+        rgb_image[mask] = lower_color + ratio * (upper_color - lower_color)
+
+    return rgb_image
 
 def process_directories(root_dir, coord_file):
     """Process subdirectories and fetch NDVI for each coordinate."""
@@ -83,19 +73,15 @@ def process_directories(root_dir, coord_file):
         lat, lon = coordinates[idx]
         aoi = create_aoi(lat, lon)  # Create the area of interest (1x1 mile square)
         
-        collection = (ee.ImageCollection('COPERNICUS/S2_SR')
+        collection = (ee.ImageCollection('USDA/NAIP/DOQQ')
                       .filterBounds(aoi)
-                      .filterDate('2022-01-01', '2022-12-31')
+                      .filterDate('2018-01-01', '2022-12-31')  # Adjust date range as needed
                       .map(get_ndvi))
         
         # Get the median NDVI image and clip it to the AOI
         ndvi_image = collection.select('NDVI').median().clip(aoi)
         
-        # Remap and enhance NDVI values
-        ndvi_remapped = remap_ndvi(ndvi_image)
-        enhanced_ndvi = enhance_image(ndvi_remapped)
-
-        # Export the NDVI GeoTIFF without color mapping
+        # Export the NDVI GeoTIFF with original values
         output_path_tif = os.path.join(root_dir, subfolder, 'ndvi.tif')
         
         print(f"Exporting NDVI GeoTIFF for {subfolder} (Lat: {lat}, Lon: {lon}) to {output_path_tif}...")
@@ -103,13 +89,19 @@ def process_directories(root_dir, coord_file):
         
         print(f"Exported NDVI GeoTIFF to: {output_path_tif}")
 
-        # Normalize and apply color mapping for PNG output
-        colored_ndvi = apply_color_map(enhanced_ndvi)
+        # Convert TIFF to PNG using cached version
+        print(f"Converting NDVI TIFF to colored PNG for {subfolder}...")
         
+        # Read the TIFF file using PIL and convert it to an array
+        ndvi_array = np.array(Image.open(output_path_tif))
+
+        # Apply color mapping to create an RGB image from the NDVI array
+        colored_ndvi = apply_color_map(ndvi_array)
+
         output_path_png = os.path.join(root_dir, subfolder, 'ndvi.png')
         
-        print(f"Exporting colored NDVI PNG for {subfolder} to {output_path_png}...")
-        geemap.ee_export_image(colored_ndvi, filename=output_path_png, scale=10, region=aoi)
+        # Save the colored PNG image
+        Image.fromarray(colored_ndvi).save(output_path_png)
         
         print(f"Exported colored NDVI PNG to: {output_path_png}")
 

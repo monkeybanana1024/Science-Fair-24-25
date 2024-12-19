@@ -17,6 +17,9 @@ if [ "$(basename "$PWD")" = "Data" ]; then
     echo "Collecting NDVI Data"
     python "$PWD/Collection/getNDVI.py"
 
+    echo "Collecting Imagery Data"
+    python "$PWD/Collection/GetSat.py"
+
     echo "Data collection completed."
 
     # Ask if user wants to proceed to processing
