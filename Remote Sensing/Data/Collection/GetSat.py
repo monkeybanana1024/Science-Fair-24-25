@@ -2,6 +2,11 @@ import ee
 import os
 import geemap
 import requests
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
+from rich.panel import Panel
+
+console = Console()
 
 # Initialize Earth Engine
 ee.Initialize(project='ee-sciencefair2425')
@@ -16,48 +21,45 @@ def create_aoi(lat, lon):
     center_point = ee.Geometry.Point([lon, lat])
     return center_point.buffer(804.672).bounds()
 
-def process_directories(root_dir, coord_file):
+def process_directories(root_dir, coord_file, progress):
     """Process subdirectories and fetch NAIP imagery for each coordinate."""
     coordinates = read_coordinates(coord_file)
     subfolders = sorted([f for f in os.listdir(root_dir) if os.path.isdir(os.path.join(root_dir, f))], key=int)
     
+    task = progress.add_task("[green]Processing coordinates", total=len(subfolders))
+
     for idx, subfolder in enumerate(subfolders):
         if idx >= len(coordinates):
-            print(f"No coordinate available for subfolder: {subfolder}. Skipping.")
+            progress.print(f"[yellow]No coordinate available for subfolder: {subfolder}. Skipping.[/yellow]")
+            progress.update(task, advance=1)
             continue
         
         lat, lon = coordinates[idx]
         aoi = create_aoi(lat, lon)
 
-        # Try to get NAIP imagery from the current year down to 6 years prior
         found_image = False
-        for year in range(2022, 2015, -1):  # Adjust starting year as needed
+        for year in range(2022, 2015, -1):
             naip = (ee.ImageCollection('USDA/NAIP/DOQQ')
                     .filterBounds(aoi)
                     .filterDate(f'{year}-01-01', f'{year}-12-31')
                     .sort('system:time_start', False))
             
-            # Check if there are any images in the collection
             if naip.size().getInfo() > 0:
                 found_image = True
-                # Create a mosaic of the images for the selected year
                 naip_image = naip.mosaic()
                 break
         
         if not found_image:
-            print(f"No NAIP imagery available for {subfolder} (Lat: {lat}, Lon: {lon}) within the last 6 years. Skipping.")
+            progress.print(f"[yellow]No NAIP imagery available for {subfolder} (Lat: {lat}, Lon: {lon}) within the last 6 years. Skipping.[/yellow]")
+            progress.update(task, advance=1)
             continue
         
         rgb_image = naip_image.select(['R', 'G', 'B'])
-        
-        # Set visualization parameters
         vizParams = {'bands': ['R', 'G', 'B'], 'min': 0, 'max': 255}
         rgb_image_vis = rgb_image.visualize(**vizParams)
         rgb_image_clipped = rgb_image_vis.clip(aoi)
         
         output_path_png = os.path.join(root_dir, subfolder, 'sat.png')
-        
-        print(f"Exporting NAIP RGB image for {subfolder} (Lat: {lat}, Lon: {lon}) to {output_path_png}...")
         
         url = rgb_image_clipped.getThumbURL({'dimensions': 1024, 'format': 'png', 'region': aoi})
 
@@ -65,13 +67,32 @@ def process_directories(root_dir, coord_file):
         if response.status_code == 200:
             with open(output_path_png, 'wb') as f:
                 f.write(response.content)
-            print(f"Exported NAIP RGB image to: {output_path_png}")
+            progress.print(f"[green]Exported NAIP RGB image to: {output_path_png}[/green]")
         else:
-            print(f"Failed to download image. Status code: {response.status_code}")
+            progress.print(f"[bold red]Failed to download image for {subfolder}. Status code: {response.status_code}[/bold red]")
+        
+        progress.update(task, advance=1)
 
-# Specify paths
-root_directory = 'Datasets/'  # Root directory containing subdirectories
-coordinates_file = 'Collection/coordinates.txt'  # Path to the coordinates.txt file
+def main():
+    root_directory = 'Datasets/'
+    coordinates_file = 'Collection/coordinates.txt'
 
-# Process all subdirectories and fetch NAIP imagery
-process_directories(root_directory, coordinates_file)
+    console.print(Panel.fit("NAIP Imagery Processing for Landslide Remote Sensing", title="Project", border_style="bold blue"))
+    console.print(f"[yellow]Root directory:[/yellow] [bold]{os.path.abspath(root_directory)}[/bold]")
+    console.print(f"[yellow]Coordinates file:[/yellow] [bold]{coordinates_file}[/bold]")
+
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeRemainingColumn()
+    )
+
+    with progress:
+        process_directories(root_directory, coordinates_file, progress)
+
+    console.print(Panel.fit("[bold green]All NAIP imagery processing completed successfully![/bold green]", title="Status", border_style="bold green"))
+
+if __name__ == "__main__":
+    main()

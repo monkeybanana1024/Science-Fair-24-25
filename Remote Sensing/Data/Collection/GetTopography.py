@@ -1,40 +1,20 @@
 import ee
 import geemap
+import os
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
+from rich.panel import Panel
 
-# Initialize Earth Engine
-ee.Initialize(project='ee-sciencefair2425')
+console = Console()
 
-# Load the NED 10m dataset
-ned = ee.Image('USGS/3DEP/10m')
-
-# Read coordinates from file
-with open('Collection/coordinates.txt', 'r') as file:
-    coordinates = [line.strip().split(',') for line in file]
-
-# Main directory
-main_dir = 'Datasets'
-
-# Starting subdirectory number
-sub_dir_num = 1
-
-# Process each coordinate pair
-for lat, lon in coordinates:
-    # Convert coordinates to float, swapping the order
+def process_coordinate(lat, lon, ned, main_dir, sub_dir_num):
     center_lat, center_lon = float(lat), float(lon)
-
-    # Create a point geometry for the center
     center_point = ee.Geometry.Point([center_lon, center_lat])
-
-    # Create a 1x1 mile square region around the center point
-    region = center_point.buffer(804.672).bounds()  # 804.672 meters is half a mile
-
-    # Clip the NED dataset to the region
+    region = center_point.buffer(804.672).bounds()
     clipped_ned = ned.clip(region)
-
-    # Define the output path
-    output_path = f'{main_dir}/{sub_dir_num}/original_topography.tif'
-
-    # Use geemap to download the image
+    output_dir = f'{main_dir}/{sub_dir_num}'
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = f'{output_dir}/original_topography.tif'
     geemap.ee_export_image(
         clipped_ned, 
         filename=output_path,
@@ -43,9 +23,40 @@ for lat, lon in coordinates:
         file_per_band=False
     )
 
-    print(f"GeoTIFF for coordinates {center_lat}, {center_lon} has been downloaded to {output_path}")
+def main():
+    ee.Initialize(project='ee-sciencefair2425')
+    ned = ee.Image('USGS/3DEP/10m')
+    
+    with open('Collection/coordinates.txt', 'r') as file:
+        coordinates = [line.strip().split(',') for line in file]
+    
+    main_dir = 'Datasets'
+    os.makedirs(main_dir, exist_ok=True)
 
-    # Increment the subdirectory number
-    sub_dir_num += 1
+    console.print(Panel.fit("Landslide Remote Sensing AI Project", title="Project", border_style="bold blue"))
+    console.print(f"[yellow]Total coordinates to process:[/yellow] [bold]{len(coordinates)}[/bold]")
+    console.print(f"[yellow]Output directory:[/yellow] [bold]{os.path.abspath(main_dir)}[/bold]")
 
-print("All downloads completed.") 
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeRemainingColumn()
+    )
+
+    with progress:
+        task = progress.add_task("[green]Processing coordinates", total=len(coordinates))
+        
+        for sub_dir_num, (lat, lon) in enumerate(coordinates, 1):
+            try:
+                process_coordinate(lat, lon, ned, main_dir, sub_dir_num)
+                progress.update(task, advance=1)
+            except Exception as e:
+                console.print(f"[bold red]Error processing coordinates {lat}, {lon}: {e}[/bold red]")
+                progress.update(task, advance=1)
+
+    console.print(Panel.fit("[bold green]All downloads completed successfully![/bold green]", title="Status", border_style="bold green"))
+
+if __name__ == "__main__":
+    main()

@@ -4,6 +4,9 @@
 if [ "$(basename "$PWD")" = "Data" ]; then
     echo "Current directory is 'Data'. Proceeding with execution."
     
+    echo "Collecting Susceptibility Data"
+    python "$PWD/Collection/GetSusceptibility.py"
+
     echo "Normalizing Coordinates"
     python "$PWD/Processing/fixCoordinates.py"
 
@@ -13,9 +16,6 @@ if [ "$(basename "$PWD")" = "Data" ]; then
 
     echo "Collecting Rain Data"
     python "$PWD/Collection/GetRain.py"
-    
-    echo "Collecting Susceptibility Data"
-    python "$PWD/Collection/GetSusceptibility.py"
     
     echo "Collecting NDVI Data"
     python "$PWD/Collection/getNDVI.py"
