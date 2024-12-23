@@ -4,11 +4,11 @@
 if [ "$(basename "$PWD")" = "Data" ]; then
     echo "Current directory is 'Data'. Proceeding with execution."
     
-    echo "Collecting Susceptibility Data"
-    python "$PWD/Collection/GetSusceptibility.py"
-
     echo "Normalizing Coordinates"
     python "$PWD/Processing/fixCoordinates.py"
+
+    echo "Collecting Susceptibility Data"
+    python "$PWD/Collection/GetSusceptibility.py"
 
     # Your commands go here
     echo "Collecting Topography"
