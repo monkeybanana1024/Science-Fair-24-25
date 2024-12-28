@@ -12,7 +12,7 @@ fi
 
 # Add all changes to the staging area
 git add .
-git restore --staged "Remote\ Sensing/Venv/"
+git reset HEAD -- D:/Science-Fair-24-25/Remote Sensing/Venv/
 
 # Commit the changes with the provided message
 git commit -m "$1"
