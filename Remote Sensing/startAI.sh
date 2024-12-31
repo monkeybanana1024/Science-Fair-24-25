@@ -4,36 +4,44 @@
 if [ "$(basename "$PWD")" = "Remote Sensing" ]; then
     echo "Current directory is 'Remote Sensing'. Proceeding with execution."
 
-    #echo "Generating Folds"
-    #python "$PWD/AI System/generateDatasets.py"
-
     while true; do
-        read -p "Do you want to proceed to XGBoost? (y/n) " yn
-        case $yn in
-            [Yy]* ) echo "Proceeding to processing..."; break;;
-            [Nn]* ) echo "Exiting..."; exit;;
-            * ) echo "Please answer yes or no.";;
+        echo "Select an option:"
+        echo "1. Run Topography"
+        echo "2. Run Aspect"
+        echo "3. Run NDVI"
+        echo "4. Run Rain"
+        read -p "Enter your choice (1-4): " choice
+        case $choice in
+            1 ) 
+                echo "Starting venv"
+                source "$PWD/Venv/xgboost/Scripts/activate"
+                echo "Venv activated"
+                echo "Running XGBoost"
+                echo "Topography"
+                python "$PWD/AI System/Topography/AI_Norm_XG.py"
+                echo "Program Completed"
+                deactivate
+                break;;
+            2 ) 
+                echo "Starting venv"
+                source "$PWD/Venv/xgboost/Scripts/activate"
+                echo "Venv activated"
+                echo "Running XGBoost"
+                echo "Aspect"
+                python "$PWD/AI System/Slope/AI_ASP_XG.py"
+                echo "Program Completed"
+                deactivate
+                break;;
+            3 ) 
+                echo "Option 3 selected (placeholder)"
+                break;;
+            4 ) 
+                echo "Option 4 selected (placeholder)"
+                break;;
+            * ) 
+                echo "Invalid option. Please enter a number between 1 and 4.";;
         esac
     done
-
-    echo 'Starting venv'
-    
-    # Activate the virtual environment
-    source "$PWD/Venv/xgboost/Scripts/activate"  # Use 'source' to activate
-
-    echo 'Venv activated'
-
-    echo "Running XGBoost"
-    echo 'Topography'
-    
-    # Run your XGBoost Python script
-    python "$PWD/AI System/Topography/AI_Norm_XG.py"
-
-    echo 'Program Completed'
-    
-    # Deactivate the virtual environment
-    deactivate
-
 else
     echo "Error: Current directory is not 'Remote Sensing'."
     echo "Current directory is: $PWD"

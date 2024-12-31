@@ -7,8 +7,10 @@ import lightgbm as lgb
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import KFold
 from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LinearRegression
 from scipy.stats import skew, kurtosis
-import optuna
+from skopt import gp_minimize
+from skopt.space import Real, Integer
 import rasterio
 import random
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
@@ -33,7 +35,7 @@ test_subdirs = all_subdirs[400:]
 def load_data(subdirs):
     X, y = [], []
     for subdir in subdirs:
-        tiff_path = os.path.join(root_dir, subdir, "normalized_topography.tif")
+        tiff_path = os.path.join(root_dir, subdir, "slope/aspect.tif")
         susc_path = os.path.join(root_dir, subdir, "susc.txt")
         if os.path.exists(tiff_path) and os.path.exists(susc_path):
             X.append(load_geotiff(tiff_path))
@@ -80,82 +82,59 @@ imputer = SimpleImputer(strategy='mean')
 X_train_scaled = imputer.fit_transform(X_train_scaled)
 X_test_scaled = imputer.transform(X_test_scaled)
 
-# Define the objective function for XGBoost optimization using Optuna
-def xgb_objective(trial):
-    max_depth = trial.suggest_int('max_depth', 30, 40)  # Reduce max_depth to limit model complexity
-    learning_rate = trial.suggest_float('learning_rate',  0.11174968802723086,  0.9)  # Narrow the learning rate range
-    n_estimators = trial.suggest_int('n_estimators', 80000, 90000)  # Lower n_estimators range for less overfitting
-    min_child_weight = trial.suggest_float('min_child_weight', 1, 10)  # Limit min_child_weight to prevent overfitting
-    subsample = trial.suggest_float('subsample', 0.6745987477023817, 1)  # Tighter range for subsample
-    colsample_bytree = trial.suggest_float('colsample_bytree', 0.6, 1.0)  # Tightened range for colsample_bytree
-    gamma = trial.suggest_float('gamma', 0, 5)  # Reduced gamma to avoid excessive regularization
-
-    lambda_ = trial.suggest_float('lambda', 0, 10)  # Regularization for XGBoost
-    alpha = trial.suggest_float('alpha', 0, 10)  # Regularization for XGBoost
-
+# Define the objective function for XGBoost optimization
+def xgb_objective(params):
+    max_depth, learning_rate, n_estimators, min_child_weight, subsample, colsample_bytree, gamma = params
+    
     model = XGBRegressor(
-        max_depth=max_depth,
+        max_depth=int(max_depth),
         learning_rate=learning_rate,
-        n_estimators=n_estimators,
+        n_estimators=int(n_estimators),
         min_child_weight=min_child_weight,
         subsample=subsample,
         colsample_bytree=colsample_bytree,
         gamma=gamma,
-        lambda_=lambda_,
-        alpha=alpha,
         objective='reg:squarederror',
         n_jobs=-1,
-        early_stopping_rounds=50  # Increase early stopping patience
+        early_stopping_rounds=20
     )
-
+    
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     scores = []
-
+    
     with Progress(SpinnerColumn(), *Progress.get_default_columns(), TimeElapsedColumn(), transient=True) as progress:
         task = progress.add_task("[green]XGBoost CV...", total=5)
         for train_index, val_index in kf.split(X_train_scaled):
             X_train_fold, X_val_fold = X_train_scaled[train_index], X_train_scaled[val_index]
             y_train_fold, y_val_fold = y_train_scaled[train_index], y_train_scaled[val_index]
-
+            
             model.fit(
                 X_train_fold,
                 y_train_fold,
                 eval_set=[(X_val_fold, y_val_fold)],
                 verbose=False
             )
-
+            
             preds = model.predict(X_val_fold)
             scores.append(mean_absolute_error(y_val_fold, preds))
             progress.update(task, advance=1)
-
+    
     return np.mean(scores)
 
-# Define the objective function for LightGBM optimization using Optuna
-def lgb_objective(trial):
-    n_estimators = trial.suggest_int('n_estimators', 90000, 90000)  # Lower n_estimators range
-    max_depth = trial.suggest_int('max_depth', 39, 39)  # Reduce max_depth range
-    learning_rate = trial.suggest_float('learning_rate', 0.001, 0.1)  # Narrow learning rate range
-    min_data_in_leaf = trial.suggest_int('min_data_in_leaf', 10, 100)  # Limit min_data_in_leaf
-
-    lambda_l1 = trial.suggest_float('lambda_l1', 0, 10)  # Regularization for LightGBM
-    lambda_l2 = trial.suggest_float('lambda_l2', 0, 10)  # Regularization for LightGBM
-
+# Define the objective function for LightGBM optimization
+def lgb_objective(params):
+    n_estimators, max_depth, learning_rate = params
     model = lgb.LGBMRegressor(
-        n_estimators=n_estimators,
-        max_depth=max_depth,
+        n_estimators=int(n_estimators),
+        max_depth=int(max_depth),
         learning_rate=learning_rate,
-        min_data_in_leaf=min_data_in_leaf,
-        lambda_l1=lambda_l1,
-        lambda_l2=lambda_l2,
         random_state=42,
         n_jobs=-1,
-        early_stopping_rounds=50,  # Increase early stopping rounds
-        verbose=-1
+        early_stopping_rounds=10
     )
-
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     scores = []
-
+    
     with Progress(SpinnerColumn(), *Progress.get_default_columns(), TimeElapsedColumn(), transient=True) as progress:
         task = progress.add_task("[green]LightGBM CV...", total=5)
         for train_index, val_index in kf.split(X_train_scaled):
@@ -166,19 +145,54 @@ def lgb_objective(trial):
             preds = model.predict(X_val_fold)
             scores.append(mean_absolute_error(y_val_fold, preds))
             progress.update(task, advance=1)
-
+    
     return np.mean(scores)
 
-# Perform Optuna optimization for each model.
-xgb_study = optuna.create_study(direction='minimize')
-xgb_study.optimize(xgb_objective, n_trials=20)
+# Perform Bayesian optimization for each model.
+xgb_result = gp_minimize(
+    xgb_objective,
+    [
+       Integer(50000, 100000),              # max_depth 
+       Real(0.001, 0.5),            # learning_rate 
+       Integer(50, 100),         # n_estimators 
+       Real(1e-5, 10),              # min_child_weight 
+       Real(0.5, 1.0),              # subsample 
+       Real(0.05, 1.0),             # colsample_bytree 
+       Real(0, 20)                  # gamma 
+   ],
+   n_calls=100,
+   random_state=42,
+   verbose=False,
+)
 
-lgb_study = optuna.create_study(direction='minimize')
-lgb_study.optimize(lgb_objective, n_trials=20)
+lgb_result = gp_minimize(
+   lgb_objective,
+   [
+       Integer(10, 75000),         # n_estimators 
+       Integer(3, 500),              # max_depth 
+       Real(0.001, 0.5)             # learning_rate 
+   ],
+   n_calls=100,
+   random_state=42,
+   verbose=False
+)
 
 # Get best parameters from optimization results.
-best_xgb_params = xgb_study.best_params
-best_lgb_params = lgb_study.best_params
+best_xgb_params = {
+   'max_depth': int(xgb_result.x[0]),
+   'learning_rate': xgb_result.x[1],
+   'n_estimators': int(xgb_result.x[2]),
+   'min_child_weight': xgb_result.x[3],
+   'subsample': xgb_result.x[4],
+   'colsample_bytree': xgb_result.x[5],
+   'gamma': xgb_result.x[6]
+}
+
+best_lgb_params = {
+   'n_estimators': int(lgb_result.x[0]),
+   'max_depth': int(lgb_result.x[1]),
+   'learning_rate': lgb_result.x[2]
+}
 
 # Train the best models.
 best_xgb_model = XGBRegressor(**best_xgb_params)
@@ -188,37 +202,55 @@ best_lgb_model = lgb.LGBMRegressor(**best_lgb_params)
 best_lgb_model.fit(X_train_scaled, y_train_scaled)
 
 # Make predictions.
-xgb_train_pred = y_scaler.inverse_transform(best_xgb_model.predict(X_train_scaled).reshape(-1, 1)).ravel()
-lgb_train_pred = y_scaler.inverse_transform(best_lgb_model.predict(X_train_scaled).reshape(-1, 1)).ravel()
+xgb_pred = y_scaler.inverse_transform(best_xgb_model.predict(X_test_scaled).reshape(-1, 1)).ravel()
+lgb_pred = y_scaler.inverse_transform(best_lgb_model.predict(X_test_scaled).reshape(-1, 1)).ravel()
 
-xgb_test_pred = y_scaler.inverse_transform(best_xgb_model.predict(X_test_scaled).reshape(-1, 1)).ravel()
-lgb_test_pred = y_scaler.inverse_transform(best_lgb_model.predict(X_test_scaled).reshape(-1, 1)).ravel()
+# Calculate metrics.
+xgb_mae = mean_absolute_error(y_test, xgb_pred)
+xgb_mse = mean_squared_error(y_test, xgb_pred)
+lgb_mae = mean_absolute_error(y_test, lgb_pred)
+lgb_mse = mean_squared_error(y_test, lgb_pred)
 
-# Calculate metrics for training set
-xgb_train_mae = mean_absolute_error(y_train, xgb_train_pred)
-xgb_train_mse = mean_squared_error(y_train, xgb_train_pred)
+print("\nXGBoost Results:")
+print(f"Mean Absolute Error: {xgb_mae:.4f}")
+print(f"Mean Squared Error: {xgb_mse:.4f}")
 
-lgb_train_mae = mean_absolute_error(y_train, lgb_train_pred)
-lgb_train_mse = mean_squared_error(y_train, lgb_train_pred)
+print("\nLightGBM Results:")
+print(f"Mean Absolute Error: {lgb_mae:.4f}")
+print(f"Mean Squared Error: {lgb_mse:.4f}")
 
-# Calculate metrics for test set
-xgb_test_mae = mean_absolute_error(y_test, xgb_test_pred)
-xgb_test_mse = mean_squared_error(y_test, xgb_test_pred)
+# Ensemble prediction (weighted average).
+ensemble_pred = (xgb_pred + (lgb_pred * 1.5)) / 2.5  # Giving more weight to LightGBM
+ensemble_mae = mean_absolute_error(y_test, ensemble_pred)
+ensemble_mse = mean_squared_error(y_test, ensemble_pred)
 
-lgb_test_mae = mean_absolute_error(y_test, lgb_test_pred)
-lgb_test_mse = mean_squared_error(y_test, lgb_test_pred)
+print("\nEnsemble Results:")
+print(f"Mean Absolute Error: {ensemble_mae:.4f}")
+print(f"Mean Squared Error: {ensemble_mse:.4f}")
 
-# Print the final hyperparameters and corresponding performance metrics.
-print("\n--- XGBoost Best Hyperparameters ---")
+# Implementing a meta-model using Linear Regression on predictions of both models.
+meta_X_train = np.column_stack((best_xgb_model.predict(X_train_scaled), best_lgb_model.predict(X_train_scaled)))
+meta_X_test = np.column_stack((best_xgb_model.predict(X_test_scaled), best_lgb_model.predict(X_test_scaled)))
+
+meta_model = LinearRegression()
+meta_model.fit(meta_X_train, y_train_scaled)  # Train on scaled target
+
+meta_preds = meta_model.predict(meta_X_test)
+
+# Inverse transform the meta predictions back to original scale.
+meta_preds_inverse = y_scaler.inverse_transform(meta_preds.reshape(-1, 1)).ravel()
+
+# Calculate metrics for meta-model.
+meta_mae = mean_absolute_error(y_test, meta_preds_inverse)
+meta_mse = mean_squared_error(y_test, meta_preds_inverse)
+
+print("\nMeta-Model Results:")
+print(f"Mean Absolute Error: {meta_mae:.4f}")
+print(f"Mean Squared Error: {meta_mse:.4f}")
+
+# Print best parameters.
+print("\nBest XGBoost Parameters:")
 print(best_xgb_params)
-print("XGBoost Training MAE:", xgb_train_mae)
-print("XGBoost Training MSE:", xgb_train_mse)
-print("XGBoost Test MAE:", xgb_test_mae)
-print("XGBoost Test MSE:", xgb_test_mse)
 
-print("\n--- LightGBM Best Hyperparameters ---")
+print("\nBest LightGBM Parameters:")
 print(best_lgb_params)
-print("LightGBM Training MAE:", lgb_train_mae)
-print("LightGBM Training MSE:", lgb_train_mse)
-print("LightGBM Test MAE:", lgb_test_mae)
-print("LightGBM Test MSE:", lgb_test_mse)
