@@ -8,9 +8,9 @@ import os
 # Simple convolution filter
 def simple_convolution(input_image):
     # Define a simple 3x3 filter (convolution kernel)
-    kernel = np.array([[0, 1, 0],
-                       [1, -4, 1],
-                       [0, 1, 0]], dtype=np.float32)
+    kernel = np.array([[-1, -1, -1],
+                       [-1, 12, -1],
+                       [-1, -1, -1]], dtype=np.float32)
 
     # Add batch and channel dimensions
     input_image = np.expand_dims(input_image, axis=0)  # Add batch dimension
@@ -104,7 +104,7 @@ def main():
     random.shuffle(subdirs)
 
     for subdir in subdirs:
-        tiff_path = os.path.join(root_dir, subdir, "normalized_topography.png")
+        tiff_path = os.path.join(root_dir, subdir, "Slope/aspect.png")
         if os.path.exists(tiff_path):
             img = load_image(tiff_path)
             if img is not None:
