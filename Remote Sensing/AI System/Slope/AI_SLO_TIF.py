@@ -27,30 +27,27 @@ def load_multiband_geotiff(file_path, target_shape=(128, 128)):
 # Optimized CNN model with increased complexity
 def cnn_model(input_shape):
     inputs = tf.keras.Input(shape=input_shape)
-    x = tf.keras.layers.Conv2D(16, (3, 3), activation='relu', padding='same')(inputs)
+
+    x = tf.keras.layers.Conv2D(16, (3, 3), activation='relu', padding='valid')(inputs)
+    x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='valid')(x)
+
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
     
-    x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same')(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
-    
-    x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
-    
-    x = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+    x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='valid')(x)
+    x = tf.keras.layers.Conv2D(128, (3, 3), activation='relu', padding='valid')(x)
+
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
     
     x = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same')(x)
     x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
     
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)  # Replace Flatten with Global Average Pooling
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = tf.keras.layers.Dense(512, activation='relu')(x)  # Replace Flatten with Global Average Pooling
     x = tf.keras.layers.Dense(256, activation='relu')(x)
     x = tf.keras.layers.Dense(128, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.5)(x)
+    x = tf.keras.layers.Dropout(0.6)(x)
     x = tf.keras.layers.Dense(64, activation='relu')(x)
     x = tf.keras.layers.Dense(32, activation='relu')(x)
     output = tf.keras.layers.Dense(4, activation='softmax')(x)
