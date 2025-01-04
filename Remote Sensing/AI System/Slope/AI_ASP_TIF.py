@@ -30,11 +30,11 @@ def cnn_model(input_shape):
     x = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='valid', strides=(2, 2))(x)
     x = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='valid', strides=(2, 2))(x)
 
-    y = tf.keras.layers.Conv2D(512, (7, 7), activation='softmax', padding='same', strides=(2, 2))(inputs)
-    y = tf.keras.layers.Conv2D(256, (5, 5), activation='softmax', padding='same', strides=(2, 2))(y)
-    y = tf.keras.layers.Conv2D(128, (5, 5), activation='softmax', padding='same', strides=(2, 2))(y)
-    y = tf.keras.layers.Conv2D(64, (3, 3), activation='softmax', padding='same', strides=(2, 2))(y)
-    y = tf.keras.layers.Conv2D(32, (3, 3), activation='softmax', padding='same', strides=(2, 2))(y)
+    y = tf.keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', strides=(2, 2))(inputs)
+    y = tf.keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', strides=(2, 2))(y)
+    y = tf.keras.layers.Conv2D(128, (5, 5), activation='relu', padding='same', strides=(2, 2))(y)
+    y = tf.keras.layers.Conv2D(64, (5, 5), activation='relu', padding='same', strides=(2, 2))(y)
+    y = tf.keras.layers.Conv2D(32, (7, 7), activation='relu', padding='same', strides=(2, 2))(y)
     
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.MaxPooling2D(pool_size=(2, 2))(x)
