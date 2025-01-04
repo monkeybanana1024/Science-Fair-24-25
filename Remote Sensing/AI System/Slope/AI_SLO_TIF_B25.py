@@ -8,7 +8,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.utils import shuffle
 from collections import Counter
 from datetime import datetime
-import subprocess
+import tensorflow.compat.v2 as tfv2
+from tensorboard import program
 
 # Function to load and resize multi-band GeoTIFF
 def load_multiband_geotiff(file_path, target_shape=(128, 128)):
@@ -119,7 +120,7 @@ def main():
     augmented_labels = []
 
     for img, label in zip(images, labels):
-        augmented_images.extend([
+        augmented_images.extend([ 
             img,  # Original
             np.flipud(img),  # Flip vertically
             np.fliplr(img),  # Flip horizontally
@@ -151,36 +152,26 @@ def main():
     log_dir = os.path.join("AI System/Slope/logs/", "AI_SLO_TIF-" + datetime.now().strftime("%Y%m%d-%H%M%S"))
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
 
-    # Launch TensorBoard in a subprocess
-    try:
-        print(f"Launching TensorBoard at log directory: {log_dir}")
-        tensorboard_process = subprocess.Popen(
-            ["tensorboard", "--logdir", log_dir],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+    # Add callbacks
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=25, restore_best_weights=True)
+    lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=10, min_lr=1e-6)
 
-        # Add callbacks
-        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=25, restore_best_weights=True)
-        lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=10, min_lr=1e-6)
+    # Print the magic command for TensorBoard in Colab
+    print(f"To start TensorBoard, run the following command in a new cell:")
+    print(f"%tensorboard --logdir {log_dir}")
 
-        history = model.fit(
-            X_train, y_train,
-            epochs=100,
-            batch_size=100,  # Reduced batch size for better generalization
-            validation_data=(X_test, y_test),
-            callbacks=[early_stopping, lr_scheduler, tensorboard_callback]
-        )
+    # Train the model
+    history = model.fit(
+        X_train, y_train,
+        epochs=150,
+        batch_size=100,  # Reduced batch size for better generalization
+        validation_data=(X_test, y_test),
+        callbacks=[early_stopping, lr_scheduler, tensorboard_callback]
+    )
 
-        # Evaluate the model
-        test_loss, test_accuracy = model.evaluate(X_test, y_test)
-        print(f"Test Accuracy: {test_accuracy:.2f}, Test Loss: {test_loss:.2f}")
-
-    finally:
-        # Ensure TensorBoard process is terminated when done
-        if tensorboard_process:
-            tensorboard_process.terminate()
-            print("TensorBoard process terminated.")
+    # Evaluate the model
+    test_loss, test_accuracy = model.evaluate(X_test, y_test)
+    print(f"Test Accuracy: {test_accuracy:.2f}, Test Loss: {test_loss:.2f}")
 
 if __name__ == "__main__":
     main()
