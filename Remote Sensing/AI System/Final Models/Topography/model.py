@@ -68,8 +68,8 @@ def main():
     model = tf.keras.models.load_model(model_path)
     print(f"Model loaded successfully from {model_path}")
 
-    root_dir = "Implementation/Datasets"  # The root directory where subfolders with image files are stored
-    subdirs = [str(i) for i in range(1, 48)]  # Assuming 47 datasets
+    root_dir = "Data/Datasets"  # The root directory where subfolders with image files are stored
+    subdirs = [str(i) for i in range(1, 501)]  # Assuming 47 datasets
 
     images = []
 
