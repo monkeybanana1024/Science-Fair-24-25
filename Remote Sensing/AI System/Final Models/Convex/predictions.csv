@@ -1,4 +1,4 @@
-Ground Truth Label,NDVI,Satellite,Slope,Predicted,Rain
+Ground Truth Label,NDVI,Satellite,Slope,Topography,Rain
 0,16.363,16.997,0.924,0.999,0.5528876
 0,15.329,0.999,0.999,0.979,2.5429094
 0,16.433,15.993,0.999,0.934,0.6255819
